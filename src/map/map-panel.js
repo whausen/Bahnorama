@@ -1,3 +1,5 @@
+import {createRailRouter} from './rail-route.js';
+
 /**
  * Ausklappbare Leaflet-Karte (unten rechts).
  * Setzt voraus, dass Leaflet global als window.L geladen ist.
@@ -35,7 +37,6 @@ export function createMapPanel(parent, options = {}) {
     zoom = DEFAULT_ZOOM,
     defaultOpen = false,
     onPoiClick,
-    onRouteRequest,
     onViewportChange,
   } = options;
 
@@ -144,6 +145,10 @@ export function createMapPanel(parent, options = {}) {
 
   const datalist = routeBar.querySelector('datalist');
   const routeMessage = routeBar.querySelector('.map-route-bar__message');
+  map.createPane('railRoute').style.zIndex = 370;
+  const routeLine = L.polyline([], {pane: 'railRoute', color: '#087769', weight: 6, interactive: false}).addTo(map);
+  let railData;
+  let railRouter;
   const stationIndex = new Map(); // Bezeichnung -> GeoJSON-Feature
 
   function indexStations(data) {
@@ -179,10 +184,14 @@ export function createMapPanel(parent, options = {}) {
       return;
     }
 
-    routeMessage.textContent = `Strecke: ${fromName} → ${toName}`;
-    fitTrip(from, to);
-
-    onRouteRequest?.(from, to); // Übergabe an main.js, dort später das Routing
+    if (railData) railRouter ??= createRailRouter(railData);
+    const route = railRouter?.(from.geometry.coordinates, to.geometry.coordinates);
+    const line = route?.map(([lon, lat]) => [lat, lon]) ?? [];
+    routeLine.setLatLngs(line);
+    routeMessage.textContent = route ? `Strecke: ${fromName} → ${toName}`
+      : railData ? 'Keine durchgehende Verbindung im Schienennetz gefunden.'
+      : 'Das Schienennetz ist noch nicht verfügbar.';
+    fitTrip(from, to, line);
   });
 
 
@@ -283,6 +292,8 @@ export function createMapPanel(parent, options = {}) {
   }
 
   function addGeoJson(data, style = {}) {
+    railData = data;
+    railRouter = undefined;
     const layer = L.geoJSON(data, {
       style: { ...style, weight: railWeightForZoom(map.getZoom()) },
       pane: 'rail',
@@ -350,14 +361,11 @@ export function createMapPanel(parent, options = {}) {
 
   map.on('zoomend', updateSelectedRadius);
 
-  // Aktuelle Fahrt muss nicht separat gemerkt werden: "Strecke zeigen" passt
-  // den Kartenausschnitt direkt an die gewählte Verbindung an.
-
   // Abstand zum Kartenrand als Anteil der Kartengröße (0.12 = 12 %)
   const FIT_PADDING_RATIO = 0.05;
   const FIT_MAX_ZOOM = 13; // verhindert zu starkes Hineinzoomen bei nahen Bahnhöfen
 
-  function fitTrip(from, to) {
+  function fitTrip(from, to, line) {
     setOpen(true);       // Panel öffnen, damit der Viewport stimmt
     map.invalidateSize(); // Kartengröße nach dem Öffnen neu bestimmen
 
@@ -369,7 +377,7 @@ export function createMapPanel(parent, options = {}) {
       Math.round(size.y * FIT_PADDING_RATIO),
     ];
 
-    map.fitBounds(L.latLngBounds(a, b), { padding, maxZoom: FIT_MAX_ZOOM });
+    map.fitBounds(L.latLngBounds([a, b, ...line]), { padding, maxZoom: FIT_MAX_ZOOM });
   }
 
   // Aktueller Standort als eigene Ebene über den Bahnhöfen
@@ -473,6 +481,8 @@ export function createMapPanel(parent, options = {}) {
   }
 
   function updateSelectionFromInputs() {
+    routeLine.setLatLngs([]);
+    routeMessage.textContent = '';
     const features = ['from', 'to']
       .map((name) => routeBar.querySelector(`[name="${name}"]`).value.trim())
       .map((value) => stationIndex.get(value))

@@ -3,7 +3,7 @@ import {createOrientation} from './device/orientation.js?v=23';
 import {createPosition} from './device/position.js';
 import {createPoseProvider} from './ar/pose.js';
 import {createOverlay} from './ar/overlay.js';
-import {createMapPanel} from './map/map-panel.js';
+import {createMapPanel} from './map/map-panel.js?v=27';
 import {createNearbyPois} from './data/nearbyPois.js';
 import {pois} from './data/mainzTestPois.js';
 import {regionalLod2Pois} from './data/regionalLod2Pois.js';
@@ -67,9 +67,6 @@ const mapPanel = window.L ? createMapPanel($('map-panel'), {
   collectedIds: collectedPoiIds(),
   onPoiClick: openPoi,
   onViewportChange: refreshMapPois,
-  onRouteRequest: (from, to) => {
-    console.log('Route angefragt:', from.properties.Bezeichnung, '→', to.properties.Bezeichnung);
-  },
 }) : null;
 
 syncCollectedPois();
