@@ -75,13 +75,9 @@ syncCollectedPois();
 
 let mapQuery = 0;
 let mapQueryTimer;
-function refreshMapPois({lat, lon, zoom}) {
+function refreshMapPois({lat, lon}) {
   const query = ++mapQuery;
   clearTimeout(mapQueryTimer);
-  if (zoom < 12) {
-    mapPanel.setPois(currentPois);
-    return;
-  }
   mapQueryTimer = setTimeout(async () => {
     try {
       const results = await loadNearbyPois(lat, lon);
@@ -94,7 +90,7 @@ function refreshMapPois({lat, lon, zoom}) {
 
 // Sicherstellen, dass alle POIs auf der Karte liegen.
 if (mapPanel) {
-  refreshMapPois({lat: 49.9881632, lon: 8.2270956, zoom: 12});
+  refreshMapPois({lat: 49.9881632, lon: 8.2270956});
 
   fetch('./src/data/rail.geojson')
     .then(response => {
