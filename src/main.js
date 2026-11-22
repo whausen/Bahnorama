@@ -27,8 +27,8 @@ console.log(`Bahnorama: ${currentPois.length} POIs geladen`);
 const loadNearbyPois = createNearbyPois();
 const nearbyGps = $('nearby-gps');
 const nearbyStatus = $('nearby-status');
-const localOsmRefs = new Set(currentPois.map(poi => poi.osmRef));
-const newPois = list => list.filter(poi => !localOsmRefs.has(poi.osmRef));
+const localOsmRefs = new Set(currentPois.map(poi => poi.osmRef).filter(Boolean));
+const newPois = list => list.filter(poi => !poi.osmRef || !localOsmRefs.has(poi.osmRef));
 
 const atlas = createAtlas();
 const recorder = createJourneyRecorder();
