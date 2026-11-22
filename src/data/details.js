@@ -1,5 +1,20 @@
+async function loadWikipediaDetails(pageId, article) {
+  const params = new URLSearchParams({
+    action: 'query', format: 'json', formatversion: '2', origin: '*',
+    prop: 'extracts|pageprops', ppprop: 'wikibase_item',
+    exintro: '1', explaintext: '1', exchars: '350', redirects: '1',
+  });
+  params.set(pageId ? 'pageids' : 'titles', pageId || article);
+  const response = await fetch('https://de.wikipedia.org/w/api.php?' + params, {
+    signal: AbortSignal.timeout(6000),
+  });
+  if (!response.ok) return null;
+  return (await response.json()).query?.pages?.[0];
+}
+
 export function createPoiDetails(dialog, collect, announce, isCollected = () => false) {
   let selected;
+  const articles = new Map();
 
   const title = dialog.querySelector('#poi-title');
   const lod2Preview = dialog.querySelector('[data-lod2-preview]');
@@ -205,5 +220,33 @@ export function createPoiDetails(dialog, collect, announce, isCollected = () => 
     error.hidden = true;
     dialog.scrollTop = 0;
     dialog.showModal();
+
+    const pageId = /^wikipedia-de-(\d+)$/.exec(poi.id)?.[1];
+    const article = poi.wikipediaArticle;
+    if (!pageId && !article) return;
+    const key = pageId ? 'id:' + pageId : 'title:' + article;
+    if (!articles.has(key)) {
+      if (articles.size >= 64) articles.delete(articles.keys().next().value);
+      const request = loadWikipediaDetails(pageId, article).catch(() => null);
+      articles.set(key, request);
+      request.then(page => {
+        if (!page && articles.get(key) === request) articles.delete(key);
+      });
+    }
+    articles.get(key).then(page => {
+      if (!page || page.missing || selected !== poi || !dialog.open) return;
+      const articleUrl = 'https://de.wikipedia.org/?curid=' + page.pageid;
+      const links = [...(poi.links ?? [{label: 'Wikipedia', href: articleUrl}])];
+      const entity = page.pageprops?.wikibase_item;
+      if (/^Q\d+$/.test(entity) && !links.some(link => link.href.endsWith('/' + entity))) {
+        links.push({label: 'Wikidata', href: 'https://www.wikidata.org/wiki/' + entity});
+      }
+      renderLinks({...poi, links});
+      if (page.extract) renderDescription({
+        description: page.extract,
+        descriptionCredit: 'Auszug aus Wikipedia · CC BY-SA',
+        descriptionSource: articleUrl,
+      });
+    });
   };
 }

@@ -32,6 +32,7 @@ async function loadWikipediaPois(fetchData, lat, lon) {
     name: entry.title, lat: entry.lat, lon: entry.lon,
     subtitle: 'Ort mit Wikipedia-Artikel',
     source: `https://de.wikipedia.org/?curid=${entry.pageid}`,
+    links: [{label: 'Wikipedia', href: `https://de.wikipedia.org/?curid=${entry.pageid}`}],
   }));
 }
 
@@ -68,8 +69,12 @@ export function createNearbyPois(fetchData = globalThis.fetch) {
           const osmRef = `${type}/${id}`;
           const source = `https://www.openstreetmap.org/${osmRef}`;
           const subtitle = labels[tags.tourism || tags.natural || tags.railway] ?? 'Kulturdenkmal';
+          const links = [{label: 'OpenStreetMap', href: source}];
+          const wikipediaArticle = tags.wikipedia?.startsWith('de:') ? tags.wikipedia.slice(3) : undefined;
+          if (wikipediaArticle) links.push({label: 'Wikipedia', href: 'https://de.wikipedia.org/wiki/' + encodeURIComponent(wikipediaArticle)});
+          if (/^Q\d+$/.test(tags.wikidata)) links.push({label: 'Wikidata', href: 'https://www.wikidata.org/wiki/' + tags.wikidata});
           return [{
-            id: `osm-${type}-${id}`, osmRef, lat, lon, name, subtitle, source,
+            id: `osm-${type}-${id}`, osmRef, lat, lon, name, subtitle, source, links, wikipediaArticle,
             sources: [{label: '© OpenStreetMap-Mitwirkende', url: 'https://www.openstreetmap.org/copyright', license: 'ODbL'}],
           }];
         }).sort((a, b) => distanceAndBearing(+centerLat, +centerLon, a.lat, a.lon).distance
