@@ -1,6 +1,6 @@
 # Bahnorama
 
-Version 23 · Weiterentwicklung des hack4GDI_DE-Prototyps von Team Oldenburg.
+Weiterentwicklung des hack4GDI_DE-Prototyps von Team Oldenburg.
 
 Bahnorama ist eine mobile Web-App, mit der du Sehenswürdigkeiten aus dem Zugfenster entdecken kannst. Die AR-Ansicht blendet Orte und ausgewählte 3D-Gebäude ins Kamerabild ein. Im persönlichen Atlas sammelst du entdeckte Orte und siehst, welche Strecken du bereits gefahren bist.
 
