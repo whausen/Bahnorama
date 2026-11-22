@@ -36,6 +36,7 @@ export function createMapPanel(parent, options = {}) {
     defaultOpen = false,
     onPoiClick,
     onRouteRequest,
+    onViewportChange,
   } = options;
 
 
@@ -55,6 +56,12 @@ export function createMapPanel(parent, options = {}) {
     maxNativeZoom: 16,
     attribution: options.basemapAttribution ?? '&copy; Esri',
   }).addTo(map);
+
+  if (onViewportChange) {
+    map.attributionControl.addAttribution(
+      '<a href="https://www.openstreetmap.org/copyright">© OpenStreetMap-Mitwirkende</a>'
+    );
+  }
 
   // Attribution nimmt nur den Platz rechts neben der Legende ein (Legende ca. 130 px)
   const attributionEl = map.attributionControl.getContainer();
@@ -247,6 +254,12 @@ export function createMapPanel(parent, options = {}) {
   }
 
   map.on('zoomend', updatePoiRadius);
+  let reportViewport = true;
+  map.on('moveend', () => {
+    if (!reportViewport) return;
+    const {lat, lng} = map.getCenter();
+    onViewportChange?.({lat, lon: lng, zoom: map.getZoom()});
+  });
 
 
   setPois(pois);
@@ -479,7 +492,14 @@ export function createMapPanel(parent, options = {}) {
     addStations,
     setLocation,
     invalidate: () => map.invalidateSize(),
-    setView: (lat, lon, z) => map.setView([lat, lon], z ?? map.getZoom()),
+    setView(lat, lon, zoom, notify = true) {
+      reportViewport = notify;
+      try {
+        map.setView([lat, lon], zoom ?? map.getZoom(), {animate: false});
+      } finally {
+        reportViewport = true;
+      }
+    },
     destroy() {
       ro.disconnect();
       map.remove();

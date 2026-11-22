@@ -15,6 +15,8 @@ Bahnorama ist eine mobile Web-App, mit der du Sehenswürdigkeiten aus dem Zugfen
 
 Ohne GPS verwendet die AR-Ansicht einen Referenzstandort in Mainz. Über **Einstellungen → Entwickleroptionen** kannst du die Blickrichtung manuell einstellen oder kalibrieren. Für einen Demo-Blick Richtung MEWA Arena eignen sich **203° Azimut und 0° Neigung**. Wenn iPhone Safari den Standortzugriff verweigert, öffne die App direkt in einem Safari-Tab und prüfe sowohl die Standortfreigabe für die Website als auch die Ortungsdienste für Safari-Websites.
 
+Auf der Karte lädt Bahnorama beim Hineinzoomen oder Verschieben Orte rund um den Kartenausschnitt aus OpenStreetMap nach. Für die AR-Ansicht aktiviere GPS und in den Einstellungen **Orte entlang der Fahrt nachladen**. Die Suche nutzt einen gerundeten Standort und den öffentlichen Overpass-Dienst. Ist er nicht erreichbar, werden stattdessen Orte mit einem deutschsprachigen Wikipedia-Artikel geladen. Die OpenStreetMap-Suche umfasst Sehenswürdigkeiten, Kulturdenkmäler, ausgewählte Naturziele und Bahnhöfe. Nachgeladene Orte lassen sich im Atlas sammeln. Die kuratierten Detailkarten und 3D-Modelle stammen weiterhin aus dem Mainzer Testgebiet.
+
 ## Lokal starten
 
 Klone das Repository und starte im Projektordner einen lokalen Webserver. Dafür genügt Python 3.

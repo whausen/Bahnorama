@@ -15,10 +15,10 @@ export function createAtlas(storage) {
   }
   return {
     read,
-    collect(poiId) {
+    collect(poiId, poi) {
       update(data => {
         if (!data.objects.some(object => object.poiId === poiId)) {
-          data.objects.push({poiId, collectedAt: new Date().toISOString()});
+          data.objects.push({poiId, collectedAt: new Date().toISOString(), ...(poi ? {poi} : {})});
         }
       });
     },

@@ -33,7 +33,7 @@ export function renderDashboard(panel, data, pois, openPoi) {
   const journeys = panel.querySelector('#atlas-journeys');
   const item = text => Object.assign(document.createElement('li'), {textContent: text});
   list.replaceChildren(...data.objects.map(entry => {
-    const poi = poisById.get(entry.poiId);
+    const poi = poisById.get(entry.poiId) ?? entry.poi;
     if (!poi) return item(entry.poiId);
     collectedPois.push(poi);
     const row = item('');

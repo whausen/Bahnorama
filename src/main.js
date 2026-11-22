@@ -4,6 +4,7 @@ import {createPosition} from './device/position.js';
 import {createPoseProvider} from './ar/pose.js';
 import {createOverlay} from './ar/overlay.js';
 import {createMapPanel} from './map/map-panel.js';
+import {createNearbyPois} from './data/nearbyPois.js';
 import {pois} from './data/mainzTestPois.js';
 import {poiEnrichment} from './data/poiEnrichment.js';
 import {createPoiDetails} from './data/details.js';
@@ -23,6 +24,12 @@ const currentPois = pois.map(poi => ({
 }));
 console.log(`Bahnorama: ${currentPois.length} POIs geladen`);
 
+const loadNearbyPois = createNearbyPois();
+const nearbyGps = $('nearby-gps');
+const nearbyStatus = $('nearby-status');
+const localOsmRefs = new Set(currentPois.map(poi => poi.osmRef));
+const newPois = list => list.filter(poi => !localOsmRefs.has(poi.osmRef));
+
 const atlas = createAtlas();
 const recorder = createJourneyRecorder();
 const collectedPoiIds = () => {
@@ -37,10 +44,15 @@ function syncCollectedPois() {
   mapPanel?.setCollected(ids);
   $('dashboard').querySelector('[data-count]').textContent = ids.length;
 }
-const openPoi = createPoiDetails($('poi-dialog'), id => {
-  atlas.collect(id);
+let selectedLivePoi;
+const openDetails = createPoiDetails($('poi-dialog'), id => {
+  atlas.collect(id, selectedLivePoi?.id === id ? selectedLivePoi : undefined);
   syncCollectedPois();
 }, announce, id => collectedPoiIds().includes(id));
+function openPoi(poi) {
+  selectedLivePoi = poi.id.startsWith('osm-') || poi.id.startsWith('wikipedia-de-') ? poi : undefined;
+  openDetails(poi);
+}
 const video = $('camera');
 const stage = $('scene-stage');
 export const desktopLayout = window.matchMedia('(min-width: 1024px)');
@@ -53,6 +65,7 @@ const mapPanel = window.L ? createMapPanel($('map-panel'), {
   zoom: 12,
   collectedIds: collectedPoiIds(),
   onPoiClick: openPoi,
+  onViewportChange: refreshMapPois,
   onRouteRequest: (from, to) => {
     console.log('Route angefragt:', from.properties.Bezeichnung, '→', to.properties.Bezeichnung);
   },
@@ -60,9 +73,28 @@ const mapPanel = window.L ? createMapPanel($('map-panel'), {
 
 syncCollectedPois();
 
+let mapQuery = 0;
+let mapQueryTimer;
+function refreshMapPois({lat, lon, zoom}) {
+  const query = ++mapQuery;
+  clearTimeout(mapQueryTimer);
+  if (zoom < 12) {
+    mapPanel.setPois(currentPois);
+    return;
+  }
+  mapQueryTimer = setTimeout(async () => {
+    try {
+      const results = await loadNearbyPois(lat, lon);
+      if (query === mapQuery) mapPanel.setPois([...currentPois, ...newPois(results)]);
+    } catch {
+      if (query === mapQuery) mapPanel.setPois(currentPois);
+    }
+  }, 450);
+}
+
 // Sicherstellen, dass alle POIs auf der Karte liegen.
 if (mapPanel) {
-  mapPanel.setPois(currentPois);
+  refreshMapPois({lat: 49.9881632, lon: 8.2270956, zoom: 12});
 
   fetch('./src/data/rail.geojson')
     .then(response => {
@@ -149,11 +181,42 @@ glassSurfaces.addEventListener('change', () => {
 });
 
 // AR-Overlay – nur eine einzige Instanz
-const renderOverlay = createOverlay(
-  $('models'), $('markers'), currentPois, openPoi, video,
+const overlayFor = entries => createOverlay(
+  $('models'), $('markers'), entries, openPoi, video,
   poi => buildings.getModel(poi),
   {showDistance: () => $('show-poi-distance').checked}
 );
+
+let renderOverlay = overlayFor(currentPois);
+let gpsQuery;
+let nextGpsSearch = 0;
+function refreshGpsPois(fix) {
+  if (!nearbyGps.checked || fix.source !== 'gps') {
+    if (gpsQuery) {
+      gpsQuery = null;
+      nextGpsSearch = 0;
+      renderOverlay = overlayFor(currentPois);
+      nearbyStatus.textContent = '';
+    }
+    return;
+  }
+  if (Date.now() < nextGpsSearch) return;
+  nextGpsSearch = Date.now() + 15000;
+  const query = loadNearbyPois(fix.lat, fix.lon);
+  if (query === gpsQuery) return;
+  gpsQuery = query;
+  nearbyStatus.textContent = 'Orte in der Umgebung werden geladen …';
+  query.then(results => {
+    if (gpsQuery !== query) return;
+    const nearby = newPois(results);
+    renderOverlay = overlayFor([...currentPois, ...nearby]);
+    nearbyStatus.textContent = `${nearby.length} zusätzliche Orte geladen.`;
+  }).catch(() => {
+    if (gpsQuery !== query) return;
+    renderOverlay = overlayFor(currentPois);
+    nearbyStatus.textContent = 'Orte in der Umgebung sind derzeit nicht abrufbar.';
+  });
+}
 
 // ============================================================
 // Bottom-Sheet im Apple-Maps-Stil
@@ -347,9 +410,10 @@ function handlePositionUpdate(fix, status, error) {
     Number.isFinite(fix.lat) && Number.isFinite(fix.lon);
   mapPanel?.setLocation(hasGpsFix ? fix.lat : null, hasGpsFix ? fix.lon : null);
   recorder.sample(fix);
+  refreshGpsPois(fix);
   mapPanel?.setLocation(fix);
   if (fix.source === 'gps' && !mapCentered) {
-    mapPanel?.setView(fix.lat, fix.lon);
+    mapPanel?.setView(fix.lat, fix.lon, undefined, nearbyGps.checked);
     mapCentered = true;
   }
   if (error) {
@@ -362,6 +426,7 @@ function handlePositionUpdate(fix, status, error) {
   announce(status);
 }
 const position = createPosition(handlePositionUpdate);
+nearbyGps.addEventListener('change', () => refreshGpsPois(position.current));
 const poses = createPoseProvider(position, orientation);
 const value = id => Number($(id).value);
 

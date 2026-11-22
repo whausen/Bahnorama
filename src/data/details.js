@@ -170,7 +170,7 @@ export function createPoiDetails(dialog, collect, announce, isCollected = () => 
 
     title.textContent = poi.name;
     if (lod2Preview) {
-      const hasLocation = typeof poi.id === 'string' && Number.isFinite(poi.lat) && Number.isFinite(poi.lon);
+      const hasLocation = typeof poi.id === 'string' && !/^(osm-|wikipedia-de-)/.test(poi.id) && Number.isFinite(poi.lat) && Number.isFinite(poi.lon);
       lod2Preview.hidden = !hasLocation;
       if (hasLocation) lod2Preview.href = './3d.html#' + encodeURIComponent(poi.id);
       lod2Preview.textContent = 'In der 3D-Ansicht öffnen';
