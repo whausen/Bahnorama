@@ -14,7 +14,7 @@ const lonScale = Math.cos(startLat * radians) * metresPerDegree;
 const baseHeight = 88;
 const initialYaw = -.38;
 const initialPitch = .92;
-const buildings = new Map(Object.entries(modelData.buildings).map(([id, {origin, vertices, triangles}]) => {
+function prepareBuilding({origin, vertices, triangles}) {
   const east = (origin[0] - startLon) * lonScale;
   const north = (origin[1] - startLat) * metresPerDegree;
   const up = origin[2] - baseHeight;
@@ -31,14 +31,37 @@ const buildings = new Map(Object.entries(modelData.buildings).map(([id, {origin,
     const shade = channels => 'rgb(' + channels.map(value => Math.round(value * light)).join(',') + ')';
     return {a, b, c, color: shade(rgb), highlight: shade([255, 193, 107])};
   });
-  return [id, {points, faces}];
-}));
+  return {points, faces};
+}
+const buildings = new Map(Object.entries(modelData.buildings).map(([id, mesh]) => [id, prepareBuilding(mesh)]));
+const tiles = new Map();
+function loadTile(file) {
+  if (!tiles.has(file)) {
+    const request = fetch('./assets/buildings/lod2/' + file, {signal: AbortSignal.timeout(20000)})
+      .then(response => {
+        if (!response.ok) throw new Error(`LoD2: HTTP ${response.status}`);
+        return response.json();
+      }).catch(error => {
+        tiles.delete(file);
+        throw error;
+      });
+    tiles.set(file, request);
+    if (tiles.size > 24) tiles.delete(tiles.keys().next().value);
+  }
+  return tiles.get(file);
+}
 const views = new Map();
 const picker = root.getElementById('poi');
+const remotePois = new Map();
 for (const poi of [...modelData.pois].sort((a, b) => a.name.localeCompare(b.name, 'de'))) {
   const key = poi.id === 'hauptbahnhof' ? 'station' : poi.id;
-  const label = poi.name + (poi.models.length ? '' : ' · Standort');
+  const label = poi.name + (poi.models.length || poi.tiles?.length ? '' : ' · Standort');
   picker.add(new Option(label, key));
+  if (poi.tiles?.length) remotePois.set(key, poi);
+  registerView(key, poi);
+}
+
+function registerView(key, poi) {
   const scene = poi.models.map(id => ({building:buildings.get(id), highlight:true}));
   const points = scene.flatMap(({building}) => building.points);
   const center = points.length ? [0,1,2].map(axis => {
@@ -137,7 +160,9 @@ function magnify(factor) {
   zoom = Math.max(.45, Math.min(5, zoom * factor));
   refresh();
 }
+let selection = 0;
 function show(next) {
+  const request = ++selection;
   focus = next;
   yaw = initialYaw;
   pitch = initialPitch;
@@ -151,6 +176,25 @@ function show(next) {
   root.getElementById('landmark').textContent = view.point ? 'POI-Standort' : view.title;
   root.getElementById('landmark-dot').classList.toggle('location', Boolean(view.point));
   refresh();
+
+  const poi = remotePois.get(next);
+  if (!poi || !view.point) return;
+  const status = root.getElementById('description');
+  status.textContent = 'LoD2-Gebäudemodell wird geladen …';
+  Promise.all(poi.tiles.map(async ([file, id]) => {
+    const mesh = (await loadTile(file)).buildings?.[id];
+    if (!mesh) throw new Error('Fehlendes LoD2-Gebäudemodell: ' + id);
+    return [id, mesh];
+  })).then(models => {
+    if (request !== selection) return;
+    for (const [id, mesh] of models) buildings.set(id, prepareBuilding(mesh));
+    registerView(next, {...poi, models: models.map(([id]) => id)});
+    show(next);
+  }).catch(error => {
+    if (request !== selection) return;
+    console.warn('LoD2-Vorschau konnte nicht geladen werden', error);
+    status.textContent = 'Das LoD2-Gebäudemodell konnte nicht geladen werden.';
+  });
 }
 picker.addEventListener('change', () => show(picker.value));
 root.getElementById('reset').onclick = () => show(focus);
