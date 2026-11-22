@@ -6,6 +6,7 @@ import {createOverlay} from './ar/overlay.js';
 import {createMapPanel} from './map/map-panel.js';
 import {createNearbyPois} from './data/nearbyPois.js';
 import {pois} from './data/mainzTestPois.js';
+import {regionalLod2Pois} from './data/regionalLod2Pois.js';
 import {poiEnrichment} from './data/poiEnrichment.js';
 import {createPoiDetails} from './data/details.js';
 import {createAtlas} from './atlas/store.js';
@@ -18,7 +19,7 @@ import {createBuildingStream} from './poi/visibilityManager.js';
 
 const $ = id => document.getElementById(id);
 const announce = message => { $('status').textContent = message; };
-const currentPois = pois.map(poi => ({
+const currentPois = [...pois, ...regionalLod2Pois].map(poi => ({
   ...poi,
   ...(poiEnrichment[poi.id] ?? {}),
 }));
@@ -155,7 +156,7 @@ async function loadBuildingManifest(path) {
 
 Promise.all([
   loadBuildingManifest('./assets/buildings/manifest.json'),
-  loadBuildingManifest('./assets/buildings/lod2/manifest.json'),
+  loadBuildingManifest('./assets/buildings/lod2/manifest.json?v=26'),
 ]).then(([osmManifest, lod2Manifest]) => {
   const osm = applyBuildingManifest(currentPois, osmManifest);
   const lod2 = applyLod2Manifest(currentPois, lod2Manifest);
