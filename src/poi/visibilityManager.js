@@ -1,0 +1,110 @@
+// Welche POIs sollen beim Vorbeifahren vorgeladen werden?
+// Die eigentliche AR-Projektion bleibt unabhängig davon.
+import {distanceAndBearing, normalize360} from '../ar/geometry.js';
+import {BUILDING_PRELOAD_DISTANCE_M, MAX_BUILDING_PRELOAD_COUNT} from '../ar/visibilityConfig.js';
+
+export function selectRelevantBuildings(pois, position, camera, {
+  maxDistanceM = BUILDING_PRELOAD_DISTANCE_M,
+  preloadAngle = 105,
+  nearbyDistanceM = 300,
+  maxCount = MAX_BUILDING_PRELOAD_COUNT,
+} = {}) {
+  if (!position || !Number.isFinite(position.lat) || !Number.isFinite(position.lon)) return [];
+  const heading = Number.isFinite(camera?.heading) ? camera.heading : null;
+  return pois.filter(poi => poi.building?.enabled).map(poi => {
+    const relative = distanceAndBearing(position.lat, position.lon, poi.lat, poi.lon);
+    if (!relative) return null;
+    const delta = heading == null || relative.bearing == null ? 0 : Math.abs(normalize360(relative.bearing - heading + 180) - 180);
+    const nearby = relative.distance <= nearbyDistanceM;
+    if (relative.distance > maxDistanceM || (!nearby && delta > preloadAngle)) return null;
+    const score = relative.distance + (nearby ? 0 : delta * 7);
+    return {poi, score};
+  }).filter(Boolean).sort((a, b) => a.score - b.score)
+    .slice(0, maxCount).map(item => item.poi);
+}
+
+export function createBuildingStream(pois, provider, {
+  onStatus = () => {}, maxModels = 24, maxConcurrent = 2,
+  updateEveryMs = 1200, retryAfterMs = 60000,
+  now = () => Date.now(),
+} = {}) {
+  const models = new Map();
+  const pending = new Set();
+  const failures = new Map();
+  const queue = [];
+  let relevantIds = new Set();
+  let lastUpdate = -Infinity;
+  let active = 0;
+
+  function emit() {
+    onStatus({loaded: models.size, loading: pending.size, errors: failures.size});
+  }
+
+  function evict() {
+    for (const id of models.keys()) {
+      if (models.size <= maxModels) break;
+      if (!relevantIds.has(id)) models.delete(id);
+    }
+  }
+
+  function pump() {
+    while (active < maxConcurrent && queue.length) {
+      const poi = queue.shift();
+      if (!pending.has(poi.id)) continue;
+      active++;
+      Promise.resolve().then(() => provider.load(poi)).then(model => {
+        if (model) {
+          models.delete(poi.id);
+          models.set(poi.id, model);
+          evict();
+        } else failures.set(poi.id, now());
+      }).catch(() => failures.set(poi.id, now()))
+        .finally(() => {
+          pending.delete(poi.id);
+          active--;
+          emit();
+          pump();
+        });
+    }
+  }
+
+  function schedule(poi) {
+    if (models.has(poi.id) || pending.has(poi.id)) return;
+    if (now() - (failures.get(poi.id) ?? -Infinity) < retryAfterMs) return;
+    failures.delete(poi.id);
+    pending.add(poi.id);
+    queue.push(poi);
+    emit();
+    pump();
+  }
+
+  return {
+    update(frame) {
+      if (now() - lastUpdate < updateEveryMs) return;
+      lastUpdate = now();
+      const relevant = selectRelevantBuildings(pois, frame.position, frame.camera, {
+        maxCount: Math.min(maxModels, MAX_BUILDING_PRELOAD_COUNT),
+      });
+      relevantIds = new Set(relevant.map(poi => poi.id));
+
+      // Keep in-flight loads, but rebuild the waiting queue in current travel order.
+      for (const poi of queue.splice(0)) pending.delete(poi.id);
+      relevant.forEach(schedule);
+    },
+    getModel(poi) {
+      const model = models.get(poi.id);
+      if (model) { // LRU-Zugriff
+        models.delete(poi.id);
+        models.set(poi.id, model);
+      }
+      return model ?? null;
+    },
+    getStatus(poi) {
+      if (models.has(poi.id)) return 'loaded';
+      if (pending.has(poi.id)) return 'loading';
+      if (failures.has(poi.id)) return 'unavailable';
+      return 'idle';
+    },
+    get counts() { return {loaded: models.size, pending: pending.size, errors: failures.size}; },
+  };
+}

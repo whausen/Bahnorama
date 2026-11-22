@@ -1,0 +1,1068 @@
+﻿/* ============================================================
+   Bahnorama · Bahn-Atlas — Liquid Glass Edition
+   Apple-Maps-Style: Vollbild-Kamera + Bottom-Sheet.
+   ============================================================ */
+
+:root {
+  font: 16px/1.45 -apple-system, "SF Pro Display", system-ui, sans-serif;
+  color-scheme: light;
+  color: #14232a;
+  background: #eef4f6;
+
+  --glass: rgba(255, 255, 255, 0.5);
+  --glass-strong: rgba(255, 255, 255, 0.68);
+  --glass-border: rgba(255, 255, 255, 0.75);
+  --glass-highlight: rgba(255, 255, 255, 0.9);
+  --line: rgba(255, 255, 255, 0.6);
+  --text: #14232a;
+  --text-muted: #4b5d66;
+  --permission-surface: #f1f7f8;
+
+  --mint: #0d9484;
+  --mint-ink: #ffffff;
+  --shadow: 0 8px 32px rgba(30, 60, 70, 0.18);
+  --scene-fallback: linear-gradient(#bcd8de, #7fa8b2);
+
+  --radius-lg: 28px;
+  --radius: 22px;
+  --radius-sm: 14px;
+  --blur: saturate(180%) blur(24px);
+  --blur-sheet: saturate(200%) blur(32px);
+  --blur-dialog: saturate(200%) blur(40px);
+
+  /* Bottom-Sheet-Zustände */
+  --sheet-peek: 6.5rem;
+  --sheet-half: 48%;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; color: var(--text); overflow: hidden; }
+
+/* --- Ambient light field -------------------------------------- */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background:
+    radial-gradient(60rem 40rem at 15% -10%, rgba(80, 220, 200, 0.35), transparent 60%),
+    radial-gradient(50rem 36rem at 90% 0%, rgba(120, 170, 255, 0.35), transparent 60%),
+    radial-gradient(46rem 34rem at 50% 110%, rgba(230, 170, 255, 0.30), transparent 60%),
+    #eef4f6;
+}
+
+/* --- Fullscreen camera stage (the start screen) --------------- */
+.scene-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--scene-fallback);
+}
+.scene-stage > * { position: absolute; inset: 0; width: 100%; height: 100%; }
+.scene-stage video { object-fit: cover; visibility: hidden; }
+.scene-stage video.active { visibility: visible; }
+.scene-stage canvas { pointer-events: none; }
+
+.markers { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+.marker {
+  position: absolute;
+  transform: translate(-50%, 0);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .1rem;
+  max-width: min(75%, 240px);
+  white-space: nowrap;
+  color: inherit;
+  background: var(--glass-strong);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border: 1px solid color-mix(in srgb, var(--mint) 45%, transparent);
+  border-radius: 999px;
+  padding: .4rem .85rem;
+  box-shadow: inset 0 1px 0 var(--glass-highlight), var(--shadow);
+  pointer-events: auto;
+}
+.marker:active:not(:disabled) { transform: translate(-50%, 0); }
+.marker__name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.marker__distance { font-size: .75rem; line-height: 1.15; color: var(--mint); font-variant-numeric: tabular-nums; }
+
+/* --- Header: floating glass bar over the camera --------------- */
+
+.brand {
+  font-weight: 800;
+  letter-spacing: .02em;
+  color: inherit;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.brand span { color: var(--mint); font-size: .85em; margin-left: .4rem; font-weight: 500; }
+nav, .actions {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  background: var(--glass);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  padding: 2px 2px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  pointer-events: auto;
+}
+
+nav button {
+  width: 44px;
+  height: 44px;
+  padding: 2px;
+  font-size: 15px;
+  border-radius: 50%;
+  line-height: 1;
+  background: transparent;
+  border: 1px solid var(--glass-border);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+}
+
+/* --- Buttons: glass pills -------------------------------------- */
+button {
+  font: inherit;
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  padding: .1rem 1rem;
+  color: inherit;
+  cursor: pointer;
+  background: var(--glass);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.05),
+    0 4px 14px rgba(0, 0, 0, 0.35);
+  transition: transform .15s ease, background .2s ease, box-shadow .2s ease;
+}
+button:active:not(:disabled) { transform: scale(.97); }
+button:disabled { opacity: .45; cursor: default; }
+button[aria-pressed="true"],
+button.primary {
+  color: var(--mint-ink);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--mint) 70%, white), var(--mint));
+  border-color: var(--glass-highlight);
+  font-weight: 700;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 6px 20px color-mix(in srgb, var(--mint) 35%, transparent);
+}
+
+h1, h2, p { margin: 0; }
+h1 { font-size: 1.35rem; letter-spacing: -.02em; }
+h2 { font-size: 1.15rem; }
+
+/* --- HUD: ein gemeinsamer Glas-Stapel über der Kamera --------- */
+/* Status, Szenen-Kopf und Gebäude-Zähler liegen zusammen in
+   einem Container mit normalem Flusslayout statt drei
+   einzeln fixierten Chips mit hartcodierten Offsets. */
+#hud {
+  position: fixed;
+  top: calc(4.2rem + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  width: min(94vw, 34rem);
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+  pointer-events: none; /* Tipps gehen an die Kamera-Ansicht */
+}
+
+/* Standort- und Blickrichtungs-Chips schweben direkt über dem Sheet.
+   JS setzt `bottom` jeden Frame passend zur sichtbaren Sheet-Höhe
+   (auch beim Ziehen); der calc-Wert deckt nur den ersten Frame ab. */
+#hud-dock {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  width: min(94vw, 34rem);
+  bottom: calc(var(--sheet-peek) + .75rem);
+  pointer-events: none; /* Tipps gehen an die Kamera-Ansicht */
+  transition: opacity .2s ease;
+}
+/* Sheet vollständig ausgefahren: Chips verschwinden garantiert. */
+#hud-dock.hud-dock--hidden { opacity: 0; }
+
+/* Standort und Blickrichtung als nebeneinanderliegende Glas-Chips */
+.hud-row {
+  display: flex;
+  gap: .5rem;
+  justify-content: center;
+  width: 100%;
+}
+.hud-chip {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .1rem;
+  margin: 0;
+  padding: 1px 1px;
+  border-radius: var(--radius);
+  background: var(--glass);
+  border: 1px solid var(--line);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  box-shadow: inset 0 1px 0 var(--glass-highlight), var(--shadow);
+}
+.hud-chip__label {
+  font-size: .68rem;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--text-muted);
+}
+.hud-chip output {
+  color: var(--mint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+/* Statusmeldungen bleiben als Live-Region für Screenreader erhalten. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Gebäudezähler: reine Infozeile in den Entwickleroptionen,
+   kein Glas-Pill mehr über der Kamera. */
+#building-status {
+  margin: .8rem 0 0;
+  font-size: .8rem;
+  color: var(--text-muted);
+}
+#recording {
+  grid-column: 3;
+  justify-self: start;
+  white-space: nowrap;
+  color: var(--mint);
+  font-weight: 600;
+}
+
+/* ============================================================
+   Bottom sheet (Apple Maps style): peek / half / full
+   ============================================================ */
+.sheet {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  z-index: 30;
+  width: min(100vw, 44rem);
+  height: calc(100dvh - 6rem);
+  transform: translate(-50%, 100%);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  border: 1px solid var(--glass-border);
+  border-bottom: none;
+  background: var(--glass);
+  backdrop-filter: var(--blur-sheet);
+  -webkit-backdrop-filter: var(--blur-sheet);
+  box-shadow: inset 0 1px 0 var(--glass-highlight), 0 -18px 50px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: transform .45s cubic-bezier(.32, .72, .32, 1);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.sheet--peek  { transform: translate(-50%, calc(100% - var(--sheet-peek))); }
+.sheet--half  { transform: translate(-50%, calc(100% - var(--sheet-half))); }
+.sheet--full  { transform: translate(-50%, 0); }
+
+/* Keep the scrollable area within the visible portion of the half-open sheet. */
+.sheet--half::after {
+  content: "";
+  flex: 0 0 calc(100% - var(--sheet-half));
+}
+
+/* Drag handle */
+.sheet__grabber,
+.sheet__grabber:hover:not(:disabled),
+.sheet__grabber:active:not(:disabled) {
+  flex: none;
+  min-height: 1.8rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  transform: none;
+  padding: .55rem 0 .2rem;
+  cursor: grab;
+  text-align: center;
+  touch-action: none;
+}
+.sheet__grabber:active { cursor: grabbing; }
+.sheet__grabber::before {
+  content: "";
+  display: inline-block;
+  width: 2.4rem;
+  height: .3rem;
+  border-radius: 999px;
+  background: var(--glass-highlight);
+}
+.sheet.dragging { transition: none; }
+
+/* Peek row: always visible primary controls */
+/* Drei gleiche Grid-Spalten: Der Button bleibt auch mit
+   laufender km-Anzeige exakt mittig, der Zähler füllt die rechte Spalte. */
+.sheet__peek {
+  flex: none;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: .75rem;
+  padding: .5rem .8rem .8rem;
+}
+#record { grid-column: 2; justify-self: center; }
+
+/* Scrollable content */
+.sheet__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 1rem 1.5rem;
+  touch-action: pan-y; /* Inhalt bleibt scrollbar */
+  overscroll-behavior: contain;
+}
+.sheet__body > * { margin-top: .9rem; }
+
+/* --- Panels inside the sheet ---------------------------------- */
+details, dialog {
+  background: var(--glass);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1rem;
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}
+summary { cursor: pointer; }
+summary::marker { color: var(--mint); }
+.settings { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: .8rem; margin-top: .8rem; }
+.settings label {
+  display: grid;
+  gap: .4rem;
+  padding: .7rem .9rem;
+  border-radius: var(--radius-sm);
+  background: var(--glass);
+  border: 1px solid var(--line);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}
+input[type="range"] { accent-color: var(--mint); }
+input[type="number"] {
+  width: 5em;
+  padding: .3rem .5rem;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--glass);
+  color: inherit;
+}
+
+/* --- Map inside the sheet -------------------------------------- */
+#map-panel {
+  position: static;
+  width: 100%;
+  height: 240px;
+  margin-bottom: 1rem;
+}
+
+/* Bei vollem Sheet: Karte fuellt die gesamte Hoehe des Sheet-Body */
+.sheet--full #map-panel {
+  height: 100%;
+  margin-bottom: 0;
+}
+
+.map-panel {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+  background: var(--glass);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+  z-index: auto;
+}
+
+/* Standardhoehe wenn nicht im full-Sheet */
+:not(.sheet--full) .map-panel {
+  height: 240px;
+}
+
+.map-panel--open {
+  width: 100%;
+}
+
+.sheet--full .map-panel--open {
+  height: 100%;
+}
+
+.map-panel__map {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+}
+
+/* The Leaflet attribution strip has a light background in both themes. */
+.leaflet-container .leaflet-control-attribution a {
+  color: #075e57;
+}
+
+.data-attribution .team-credit {
+  margin: .35rem 0 0;
+  text-align: center;
+}
+
+/* --- Atlas dashboard (opaque, scrollable) ---------------------- */
+#dashboard {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  overflow-y: auto;
+  padding: 5.5rem 1rem 2rem;
+}
+.atlas-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .75rem;
+  margin: .85rem 0;
+}
+.atlas-stats button {
+  position: relative;
+  padding: .65rem .75rem;
+  border-radius: var(--radius-sm);
+  text-align: left;
+}
+.atlas-stats strong { display: block; color: var(--mint); font-size: 1.55rem; }
+.atlas-stats button::after {
+  content: '';
+  position: absolute;
+  top: .9rem;
+  right: .8rem;
+  width: .35rem;
+  height: .35rem;
+  border: solid currentColor;
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+.atlas-stats button[aria-expanded="true"] { border-color: var(--mint); }
+.atlas-stats button[aria-expanded="true"]::after { transform: rotate(225deg); }
+.atlas-list {
+  max-height: 11rem;
+  overflow: auto;
+  margin: 0 0 .85rem;
+  padding: .5rem .75rem .5rem 1.65rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--glass);
+}
+.atlas-list li + li { margin-top: .35rem; }
+.atlas-map {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--glass);
+}
+.atlas-map__view {
+  height: clamp(280px, 56dvh, 620px);
+  isolation: isolate;
+}
+.atlas-map__heat {
+  position: absolute;
+  pointer-events: none;
+}
+.atlas-map__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem 1rem;
+  padding: .55rem .75rem;
+  font-size: .8rem;
+}
+.atlas-map__legend > span { display: inline-flex; align-items: center; gap: .4rem; }
+.atlas-map__gradient {
+  width: 2.6rem;
+  height: .45rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #6b63ff, #f79032, #e6224d);
+}
+[data-atlas-map-status] { padding: .4rem .75rem .7rem; }
+
+/* --- Dialog ---------------------------------------------------- */
+dialog {
+  width: min(30rem, calc(100% - 2rem));
+  color: inherit;
+  padding: 1.5rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  background: var(--glass-strong);
+  backdrop-filter: var(--blur-dialog);
+  -webkit-backdrop-filter: var(--blur-dialog);
+  box-shadow: inset 0 1px 0 var(--glass-highlight), 0 32px 80px rgba(0, 0, 0, 0.5);
+}
+dialog::backdrop { background: rgba(0, 0, 0, 0.35); backdrop-filter: blur(8px); }
+[data-glass="off"] dialog::backdrop { backdrop-filter: none; background: rgba(0, 0, 0, 0.55); }
+dialog img { display: block; max-width: 100%; border-radius: var(--radius-sm); }
+.close { float: right; padding: .15rem .7rem; font-size: 1rem; }
+a { color: var(--mint); }
+
+/* --- POI info dialog ------------------------------------------- */
+#poi-dialog {
+  width: min(42rem, calc(100% - 1.5rem));
+  max-height: min(92dvh, 58rem);
+  padding: 1rem 1.2rem 1.2rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+#poi-dialog[open] {
+  display: grid;
+  align-content: start;
+  gap: .9rem;
+}
+.poi-dialog__close {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  display: flex;
+  justify-content: flex-end;
+  margin: -.45rem -.5rem -.35rem;
+  pointer-events: none;
+}
+.poi-dialog__close .close {
+  float: none;
+  pointer-events: auto;
+  padding: .05rem .62rem;
+  font-size: 1.15rem;
+  line-height: 1.25;
+  background: color-mix(in srgb, var(--glass-strong) 85%, transparent);
+}
+.poi-dialog__header { display: grid; gap: .35rem; padding-right: 2rem; }
+.poi-dialog__eyebrow { display: flex; flex-wrap: wrap; gap: .35rem; }
+.poi-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: .2rem .55rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--mint) 35%, transparent);
+  background: color-mix(in srgb, var(--mint) 12%, transparent);
+  color: var(--mint);
+  font-size: .72rem;
+  font-weight: 600;
+  letter-spacing: .02em;
+}
+.poi-chip--muted {
+  border-color: var(--line);
+  background: var(--glass);
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.poi-chip--atlas {
+  border-color: color-mix(in srgb, var(--mint) 55%, transparent);
+  background: color-mix(in srgb, var(--mint) 22%, transparent);
+}
+#poi-dialog h2 {
+  font-size: clamp(1.35rem, 4vw, 1.8rem);
+  line-height: 1.08;
+  letter-spacing: -.03em;
+}
+.poi-dialog__subtitle { color: var(--text-muted); font-size: .95rem; }
+.poi-dialog__photos {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .55rem;
+}
+.poi-photo { display: grid; gap: .3rem; margin: 0; min-width: 0; }
+.poi-photo:first-child { grid-column: 1 / -1; }
+.poi-photo img {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  border: 1px solid var(--line);
+}
+.poi-photo:first-child img { aspect-ratio: 16 / 9; }
+.poi-photo figcaption {
+  display: flex;
+  justify-content: space-between;
+  gap: .5rem;
+  color: var(--text-muted);
+  font-size: .68rem;
+  line-height: 1.35;
+}
+.poi-photo__source { color: var(--text-muted); text-decoration: underline; text-underline-offset: 2px; }
+.poi-dialog__section { display: grid; gap: .5rem; }
+.poi-dialog__heading {
+  margin: 0;
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.poi-dialog__description { line-height: 1.58; }
+.poi-dialog__credit { color: var(--text-muted); font-size: .7rem; line-height: 1.4; }
+.poi-dialog__credit a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.poi-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .5rem;
+  margin: 0;
+}
+.poi-fact {
+  min-width: 0;
+  padding: .55rem .7rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--glass);
+}
+.poi-fact dt {
+  color: var(--text-muted);
+  font-size: .67rem;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.poi-fact dd {
+  margin: .15rem 0 0;
+  font-weight: 600;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.poi-links {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  gap: .5rem;
+}
+.poi-link {
+  display: grid;
+  gap: .08rem;
+  min-width: 0;
+  padding: .55rem .7rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--glass);
+  color: inherit;
+  text-decoration: none;
+  transition: background .2s ease, border-color .2s ease;
+}
+.poi-link:hover { background: var(--glass-strong); border-color: var(--glass-border); }
+.poi-link__label { color: var(--mint); font-weight: 650; font-size: .86rem; }
+.poi-link__hint {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: .68rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.poi-dialog__footer {
+  display: grid;
+  gap: .25rem;
+  padding-top: .55rem;
+  border-top: 1px solid var(--line);
+}
+.poi-dialog__coordinates,
+.poi-dialog__sources { color: var(--text-muted); font-size: .7rem; line-height: 1.45; }
+.poi-dialog__sources a { color: var(--text-muted); text-decoration: underline; text-underline-offset: 2px; }
+.poi-dialog__error { color: #b91c1c; font-size: .8rem; }
+.poi-dialog__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .35rem .55rem;
+}
+.poi-dialog__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  max-width: 100%;
+  padding: .5rem .8rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: #087769;
+  color: #fff;
+  font-family: inherit;
+  font-size: .85rem;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+  text-decoration: none;
+  box-shadow: none;
+}
+.poi-dialog__action:hover { background: #066457; }
+.poi-dialog__action:active { transform: scale(.97); }
+.poi-dialog__action:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+@media (max-width: 520px) {
+  #poi-dialog { width: calc(100% - 1rem); padding: .85rem .9rem 1rem; }
+  .poi-dialog__header { padding-right: 1.5rem; }
+  .poi-dialog__photos { grid-template-columns: 1fr; }
+  .poi-photo:first-child { grid-column: auto; }
+  .poi-facts { grid-template-columns: 1fr; }
+}
+/* --- Building data credits ------------------------------------ */
+.data-attribution {
+  font-size: .72rem;
+  color: var(--text-muted);
+}
+
+/* Settings below the map */
+.sheet-settings { display: grid; gap: .75rem; }
+.settings-check { display: flex; gap: .65rem; align-items: flex-start; cursor: pointer; }
+.settings-check input { margin-top: .25rem; accent-color: var(--mint); }
+.device-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .45rem; }
+.device-actions button { font-size: .85rem; padding: .6rem .35rem; }
+.device-status { color: var(--text-muted); font-size: .82rem; }
+.developer-options { padding: .75rem; border-color: var(--line); }
+.developer-options summary { font-weight: 600; }
+.developer-body { padding-top: .65rem; }
+.calibration-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; margin-top: .8rem; }
+.calibration-form label { grid-column: 1 / -1; display: flex; align-items: center; flex-wrap: wrap; gap: .4rem; font-size: .85rem; }
+.calibration-form button { padding-inline: .5rem; overflow-wrap: anywhere; }
+.calibration-form button[type="submit"] { grid-column: 1 / -1; }
+.permission-banner { pointer-events: auto; padding: .75rem 1rem; border: 1px solid var(--glass-border); border-radius: var(--radius); background: var(--permission-surface); display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; }
+.permission-banner button { flex-shrink: 0; }
+
+@media (max-width: 560px) {
+  .header { gap: .4rem; }
+  .brand span { display: none; }
+  nav { gap: .3rem; }
+  nav button { padding-inline: .65rem; }
+}
+@media (max-width: 365px) {
+  .header nav { order: 1; width: 100%; justify-content: center; }
+  #hud { top: calc(6.9rem + env(safe-area-inset-top)); }
+  #dashboard { padding-top: calc(7.5rem + env(safe-area-inset-top)); }
+  .sheet { height: calc(100dvh - 7rem); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}
+
+.map-route-bar {
+  display: flex;
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  z-index: 1000;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin: 0;
+  /* Rechts Platz für den fest positionierten Ein-/Ausklapp-Button lassen */
+  padding: 6px 48px 6px 6px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 6px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Eingeklappt: nur ein einzelner Button oben rechts in der Karte */
+.map-route-bar.map-route-bar--collapsed {
+  left: auto;
+  right: 8px;
+  width: auto;
+  padding: 6px;
+  background: transparent;
+  box-shadow: none;
+}
+
+.map-route-bar__toggle {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 1;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid rgba(15, 23, 42, 0.18);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  color: #1e293b;
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+/* Im eingeklappten Zustand bestimmt der Button selbst die Größe der Leiste;
+   dadurch sitzt er exakt an derselben Stelle wie im ausgeklappten Zustand. */
+.map-route-bar.map-route-bar--collapsed .map-route-bar__toggle {
+  position: static;
+}
+
+/* Standort-Button direkt in der Kartenansicht (unter den Zoom-Buttons) */
+.leaflet-bar a.map-locate-control__button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.map-locate-control__button svg {
+  width: 17px;
+  height: 17px;
+}
+
+.map-locate-control__button[aria-disabled="true"] {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.map-route-bar input {
+  flex: 1 1 140px;
+  min-width: 0;
+  padding: 4px 6px;
+}
+
+.map-route-bar__message:empty {
+  display: none;
+}
+
+.map-route-bar__message {
+  width: 100%;
+  margin: 0;
+  font-size: 0.85em;
+}
+
+.map-legend {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: .25rem;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  color: #1e293b;
+  font-size: .72rem;
+  line-height: 1.2;
+  text-align: left;
+  pointer-events: none;
+}
+
+.map-legend__item {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: .3rem;
+  width: 100%;
+}
+
+.map-legend__dot {
+  flex: none;
+  width: .55rem;
+  height: .55rem;
+  border-radius: 50%;
+  border: 2px solid;
+}
+
+.map-legend__dot--collected {
+  background: #2dd4bf;
+  border-color: #0f766e;
+}
+
+.map-legend__dot--open {
+  background: #3b82f6;
+  border-color: #1e3a8a;
+}
+
+/* Eingeklappt: alles außer dem Schalter ausblenden */
+.map-route-bar.map-route-bar--collapsed > :not(.map-route-bar__toggle) {
+  display: none;
+}
+
+
+
+[hidden] { display: none !important; }
+
+/* ============================================================
+   Performance-Modus: transparente Glasflächen deaktiviert.
+   Ein Toggle in den Einstellungen setzt data-glass="off" am
+   <html>-Element. Die 24px-Backdrop-Blur-Effekte über der
+   laufenden Kamera (23 Flächen: Header, Sheet, Marker, Banner,
+   Karte, Dialog …) erzwingen auf jedem Frame ein Offscreen-
+   Rendering und brechen auf Mittelklasse-Smartphones massiv
+   ein. Im Performance-Modus sind die Glasflächen opak und
+   die Schlagschatten flach – layout- und funktionsidentisch.
+   ============================================================ */
+[data-glass="off"] {
+  --blur: none;
+  --blur-sheet: none;
+  --blur-dialog: none;
+  --glass: #eef3f5;
+  --glass-strong: #f8fbfc;
+  --glass-border: rgba(20, 35, 42, .16);
+  --glass-highlight: rgba(255, 255, 255, .5);
+  --shadow: 0 2px 10px rgba(30, 60, 70, .12);
+}
+
+[data-glass="off"] .poi-dialog__close .close { background: var(--glass-strong); }
+
+.lod2-preview-link {
+  display: inline-block;
+  width: fit-content;
+  padding: .4rem .65rem;
+  border-radius: .55rem;
+  background: #e0f4ef;
+  color: #075e57;
+  font-size: .85rem;
+  font-weight: 650;
+}
+
+@media (max-width: 1023px) {
+  .header nav {
+    top: calc(.6rem + env(safe-area-inset-top));
+    width: max-content;
+    max-width: calc(100vw - 1rem);
+    gap: .2rem;
+    flex-wrap: nowrap;
+    padding: .2rem;
+    background: var(--permission-surface);
+    border-radius: 1rem;
+    box-shadow: 0 3px 12px #16323826;
+  }
+
+  .header nav button, .header nav a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: auto;
+    height: auto;
+    min-height: 44px;
+    padding: .25rem clamp(.45rem, 2.1vw, .8rem);
+    border: 0;
+    border-radius: .72rem;
+    color: var(--text);
+    font-size: .875rem;
+    font-weight: 650;
+    line-height: 1.2;
+    white-space: nowrap;
+    text-decoration: none;
+  }
+
+  .header nav a { color: var(--mint); }
+  .header nav button[aria-pressed="true"] { background: var(--mint); color: var(--mint-ink); }
+
+  #hud { top: calc(4.1rem + env(safe-area-inset-top)); }
+  #dashboard { padding-top: calc(4.45rem + env(safe-area-inset-top)); }
+  #hud .permission-banner { justify-content: flex-start; gap: .3rem .5rem; padding: .5rem .7rem; border-radius: .9rem; }
+  #permission-message, #permission-gps-status { flex-basis: 100%; font-size: .82rem; }
+  #hud .permission-banner button { min-height: 44px; padding: .35rem .65rem; font-size: .8rem; box-shadow: none; }
+
+  #hud-dock { width: fit-content; max-width: calc(100vw - 1.25rem); gap: .35rem; }
+  .hud-chip {
+    flex: 0 1 auto;
+    flex-direction: row;
+    gap: .4rem;
+    padding: .25rem .55rem;
+    border-radius: .6rem;
+    background: var(--permission-surface);
+    box-shadow: none;
+  }
+  .hud-chip__label { font-size: .69rem; text-transform: none; letter-spacing: normal; }
+  .hud-chip output { color: var(--text); font-size: .78rem; }
+
+  .sheet {
+    --sheet-peek: calc(5.65rem + env(safe-area-inset-bottom));
+    background: var(--permission-surface);
+  }
+  .sheet:has(#recording:not(:empty)) {
+    --sheet-peek: calc(6.8rem + env(safe-area-inset-bottom));
+  }
+  .sheet__grabber { min-height: 1.5rem; padding: .25rem 0; line-height: 1; }
+  .sheet__grabber::before { background: var(--text-muted); opacity: .5; }
+  .sheet__peek {
+    width: min(100%, 34rem);
+    margin-inline: auto;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .15rem .55rem;
+    padding: .25rem .75rem .45rem;
+  }
+  #sheet-map-toggle, .sheet__peek #record {
+    min-height: 44px;
+    width: 100%;
+    padding: .4rem .35rem;
+    font-size: .875rem;
+    border-radius: .72rem;
+  }
+  .sheet__peek #recording {
+    grid-column: 1 / -1;
+    justify-self: end;
+    font-size: .75rem;
+    color: var(--text);
+  }
+  .sheet__peek #recording:empty { display: none; }
+}
+
+@media (max-width: 1023px) {
+  .header nav a { color: #075e57; }
+  .header nav button[aria-pressed="true"],
+  .sheet__peek #record,
+  #hud #enable-ar { background: #087769; color: #fff; }
+}
+
+#preview-3d {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  height: 100dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: #eef4f6;
+  color: #14232a;
+}
+
+@media (max-width: 1023px) {
+  .header {
+    position: fixed;
+    inset: 0 0 auto;
+    z-index: 80;
+    display: flex;
+    justify-content: center;
+    padding: calc(.6rem + env(safe-area-inset-top)) .5rem 0;
+    pointer-events: none;
+    isolation: isolate;
+  }
+  .header nav {
+    position: relative;
+    inset: auto;
+    transform: none;
+    width: max-content;
+    max-width: 100%;
+    pointer-events: auto;
+  }
+  .header nav button, .header nav a {
+    position: relative;
+    pointer-events: auto;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+}

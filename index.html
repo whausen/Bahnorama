@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="de" data-glass="off">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Bahnorama · Bahnatlas</title>
+  <link rel="icon" href="./favicon.ico" type="image/x-icon">
+  <link rel="stylesheet" href="./style.css?v=23">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script type="module" src="./src/desktop.js?v=23"></script>
+  <script type="module" src="./src/preview3d.js?v=23"></script>
+  <link rel="stylesheet" href="./desktop.css?v=23">
+  <script>
+    (function () {
+      // A saved choice takes precedence over the automatic default.
+      let savedGlass;
+      try {
+        savedGlass = localStorage.getItem("bahnorama.glassSurfaces.v1") ??
+          localStorage.getItem("windowlens.glassSurfaces.v1");
+      } catch { /* Storage may be unavailable. */ }
+
+      const supportsGlass = window.CSS?.supports("backdrop-filter", "blur(1px)") ||
+        window.CSS?.supports("-webkit-backdrop-filter", "blur(1px)");
+      const reduceTransparency = window.matchMedia("(prefers-reduced-transparency: reduce)").matches;
+      const iPhoneVersion = navigator.userAgent.match(/iPhone OS (\d+)/);
+      const modernIPhone = iPhoneVersion && Number(iPhoneVersion[1]) >= 18;
+      const reportedCapacity = navigator.deviceMemory >= 8 && navigator.hardwareConcurrency >= 8;
+      const autoGlass = supportsGlass && !reduceTransparency && (modernIPhone || reportedCapacity);
+      const glassEnabled = savedGlass === "on" || (savedGlass !== "off" && autoGlass);
+      if (glassEnabled) delete document.documentElement.dataset.glass;
+    })();
+  </script>
+</head>
+<body>
+  <!-- Startbildschirm: Vollbild-Kamera, hinter allem Glas -->
+  <div class="scene-stage" id="scene-stage">
+    <video id="camera" autoplay muted playsinline></video>
+    <canvas id="models" aria-hidden="true"></canvas>
+    <div id="markers" class="markers"></div>
+  </div>
+
+  <header class="header">
+    <nav aria-label="Ansichten">
+      <button id="explore" type="button" aria-pressed="true">AR-Ansicht</button>
+      <button id="atlas" type="button" aria-pressed="false">Atlas</button>
+      <a href="./3d.html">3D</a>
+    </nav>
+  </header>
+
+  <section id="scene" aria-labelledby="scene-title">
+ <!-- HUD: Standort und Blickrichtung als nebeneinanderliegende Glas-Chips -->
+    <div id="hud">
+      <h1 id="scene-title" class="visually-hidden">Blick aus dem Zug</h1>
+      <p id="status" class="visually-hidden" role="status">Anwendung wird gestartet …</p>
+      <div id="permission-banner" class="permission-banner" hidden>
+        <span id="permission-message">Für AR ist eine Berechtigung erforderlich.</span>
+        <button id="enable-ar" type="button" class="primary">AR aktivieren</button>
+        <button id="permission-gps" type="button" hidden>GPS aktivieren</button>
+        <span id="permission-gps-status" hidden></span>
+      </div>
+    </div>
+
+    <!-- Standort und Blickrichtung: schweben direkt über dem Sheet -->
+    <div class="hud-row" id="hud-dock">
+      <p class="hud-chip">
+        <span class="hud-chip__label">Standort</span>
+        <output id="position" aria-label="Positionsgenauigkeit">—</output>
+      </p>
+      <p class="hud-chip">
+        <span class="hud-chip__label">Blickrichtung</span>
+        <output id="pose" aria-label="Blickrichtung in Grad">203°</output>
+      </p>
+    </div>
+
+    <!-- Bottom-Sheet im Apple-Maps-Stil: peek → half → full -->
+    <div class="sheet sheet--peek" id="sheet" aria-label="Bedienelemente">
+      <button type="button" class="sheet__grabber" id="sheet-grabber" aria-controls="sheet-body" aria-expanded="false" aria-label="Karte ein- und ausklappen"></button>
+
+      <!-- Immer sichtbare Primärsteuerung -->
+      <div class="sheet__peek">
+        <button type="button" id="sheet-map-toggle" aria-expanded="false" aria-controls="sheet-body">Karte öffnen</button>
+        <button type="button" id="record" class="primary">Fahrt starten</button>
+        <output id="recording"></output>
+      </div>
+
+      <!-- Inhalt: erst beim Ausziehen sichtbar -->
+      <div class="sheet__body" id="sheet-body" inert>
+        <div id="map-panel"></div>
+        <section class="sheet-settings" aria-labelledby="settings-title">
+          <h2 id="settings-title">Einstellungen</h2>
+          <div class="device-actions">
+            <button type="button" id="camera-toggle">Kamera aktivieren</button>
+            <button type="button" id="switch" disabled>Kamera wechseln</button>
+            <button type="button" id="gps">GPS aktivieren</button>
+            <button type="button" id="sensors">Sensoren aktivieren</button>
+          </div>
+          <p class="device-status" id="sensor-status" role="status">Sensorstatus wird geprüft.</p>
+          <label class="settings-check">
+            <input id="show-poi-distance" type="checkbox">
+            <span>Entfernung an POIs anzeigen</span>
+          </label>
+          <label class="settings-check">
+            <input id="glass-surfaces" type="checkbox" aria-describedby="glass-surfaces-help">
+            <span>Transparente Glasflächen</span>
+          </label>
+          <p id="glass-surfaces-help" class="device-status">Die Voreinstellung richtet sich nach deinem Gerät. Deine Auswahl wird für diesen Browser gespeichert.</p>
+          <details id="developer-options" class="developer-options">
+            <summary>Entwickleroptionen · Kalibrierung</summary>
+            <div class="developer-body">
+              <label class="settings-check"><input type="checkbox" id="manual" checked> Manuelle Blickrichtung</label>
+              <div class="settings" id="manual-controls">
+                <label>Azimut <input id="heading" type="range" min="0" max="359" value="203"></label>
+                <label>Neigung <input id="pitch" type="range" min="-89" max="89" value="0"></label>
+              </div>
+              <div class="settings">
+                <label>Horizontales Sichtfeld <input id="hfov" type="range" min="30" max="120" value="65"></label>
+                <label>Vertikales Sichtfeld <input id="vfov" type="range" min="25" max="110" value="55"></label>
+              </div>
+              <p id="building-status" role="status">0 Gebäude geladen</p>
+              <form id="calibration" class="calibration-form">
+                <label>Bekannter Azimut (°) <input id="known-heading" type="number" min="0" max="359.9" step="any" value="0" required></label>
+                <button type="submit">Azimut kalibrieren</button>
+                <button type="button" id="zero">Neigung nullen</button>
+                <button type="button" id="reset">Kalibrierung löschen</button>
+              </form>
+            </div>
+          </details>
+        </section>
+        <footer class="data-attribution">©GeoBasis-DE / <a href="https://www.lvermgeo.rlp.de">LVermGeoRP</a> 2026 (LoD2)  <a href="https://www.govdata.de/dl-de/by-2-0">dl-de/by-2-0</a> [Daten bearbeitet]<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap-Mitwirkende (ODbL)</a> (POI) <a href="https://www.geofabrik.de/data/download.html" target="_blank" rel="noopener noreferrer">Geofabrik-Extrakt</a> (POI) <p class="team-credit">Made with 🩷 by Team Oldenburg</p></footer>
+      </div>
+    </div>
+  </section>
+
+  <div id="desktop-app" hidden aria-label="Bahnorama Desktop">
+    <header class="desktop-topbar">
+      <div class="desktop-brand"><span class="desktop-brand-icon">🚆</span><div><strong>Bahnorama</strong><small>Entdecke die Welt entlang der Schienen</small></div></div>
+      <div class="desktop-top-actions" role="navigation" aria-label="Ansichten"><button type="button" id="desktop-map-button" aria-pressed="true">🗺 Karte</button><button type="button" id="desktop-ar-button" aria-pressed="false">📷 AR-Ansicht</button><button type="button" id="desktop-atlas-button" aria-pressed="false">📖 Atlas</button></div>
+    </header>
+    <main class="desktop-main" id="desktop-main">
+      <section class="desktop-map-area" aria-labelledby="desktop-map-title">
+        <div class="desktop-map-heading"><strong id="desktop-map-title">Strecken & Sehenswürdigkeiten</strong><span id="desktop-map-subtitle">Interaktive Karte</span><a class="lod2-preview-link" href="./3d.html">3D</a></div>
+        <div id="desktop-map-host"></div>
+        <div id="desktop-ar-host" hidden>
+          <div id="desktop-ar-stage"></div>
+          <div class="desktop-ar-controls">
+            <button type="button" id="desktop-camera-toggle">Kamera aktivieren</button>
+            <div id="desktop-ar-permissions"></div>
+          </div>
+        </div>
+      </section>
+      <aside class="desktop-sidebar" aria-label="Fahrt und Einstellungen"><div class="desktop-sidebar-heading"><strong>Deine Bahnfahrt</strong><span>Entdecken · Sammeln · Erleben</span></div><div id="desktop-record-host"></div>
+      <section class="desktop-trip-info" aria-label="Informationen zur Fahrt">
+        <h2>Fahrtübersicht</h2>
+        <div class="desktop-trip-stats">
+          <div><span>Standort</span><strong id="desktop-location">Noch nicht verfügbar</strong></div>
+          <div><span>Gesammelte Orte</span><strong id="desktop-collected">0</strong></div>
+          <div><span>Gefahrene Kilometer</span><strong id="desktop-km">0 km</strong></div>
+        </div>
+        <p class="desktop-trip-note">Die Karte zeigt die bisher eingebundenen Sehenswürdigkeiten. Die Standortanzeige benötigt eine GPS-Freigabe.</p>
+        <button type="button" id="desktop-open-atlas" class="desktop-atlas-link">Sammelatlas öffnen</button>
+      </section>
+      <details class="desktop-settings-details" id="desktop-settings-details">
+        <summary>⚙ Einstellungen und Sensoren</summary>
+        <div id="desktop-settings-host"></div>
+      </details>
+      <div class="desktop-sidebar-foot">Bahnorama · Team Oldenburg · hack4GDI_DE 2026</div></aside>
+    </main>
+    <div id="desktop-attribution-host"></div>
+  </div>
+
+  <section id="dashboard" aria-labelledby="atlas-title" hidden>
+    <h1 id="atlas-title">Dein Atlas</h1>
+    <div class="atlas-stats">
+      <button type="button" aria-expanded="false" aria-controls="atlas-objects">
+        <strong data-count>0</strong> Gesammelte POIs
+      </button>
+      <button type="button" aria-expanded="false" aria-controls="atlas-journeys">
+        <strong><span data-distance>0</span> km</strong> Gefahrene Kilometer
+      </button>
+    </div>
+    <ul id="atlas-objects" class="atlas-list" aria-label="Gesammelte POIs" hidden></ul>
+    <ul id="atlas-journeys" class="atlas-list" aria-label="Aufgezeichnete Fahrten" hidden></ul>
+    <div class="atlas-map">
+      <div class="atlas-map__view" data-atlas-map role="region" aria-label="Karte mit gesammelten POIs und aufgezeichneten Fahrten"></div>
+      <div class="atlas-map__legend">
+        <span><span class="map-legend__dot map-legend__dot--collected" aria-hidden="true"></span> Gesammelter POI</span>
+        <span><span class="atlas-map__gradient" aria-hidden="true"></span> Selten bis häufig befahren</span>
+      </div>
+      <p data-atlas-map-status role="status" hidden></p>
+    </div>
+  </section>
+
+  <dialog id="poi-dialog" aria-labelledby="poi-title">
+    <form method="dialog" class="poi-dialog__close">
+      <button class="close" aria-label="Details schließen">×</button>
+    </form>
+
+    <header class="poi-dialog__header">
+      <p class="poi-dialog__eyebrow">
+        <span class="poi-chip" data-category hidden></span>
+        <span class="poi-chip poi-chip--muted" data-area hidden></span>
+        <span class="poi-chip poi-chip--atlas" data-atlas-status tabindex="-1" hidden>Im Atlas</span>
+      </p>
+      <h2 id="poi-title"></h2>
+      <p class="poi-dialog__subtitle" data-subtitle hidden></p>
+      <div class="poi-dialog__actions">
+        <button type="button" class="poi-dialog__action" data-collect>In Atlas aufnehmen</button>
+        <a class="poi-dialog__action" data-lod2-preview href="./3d.html" hidden>In der 3D-Ansicht öffnen</a>
+      </div>
+      <p class="poi-dialog__error" data-error role="alert" hidden></p>
+    </header>
+
+    <div class="poi-dialog__photos" data-photos hidden></div>
+
+    <section class="poi-dialog__section" data-description-section hidden>
+      <p class="poi-dialog__description" data-description></p>
+      <p class="poi-dialog__credit" data-description-credit hidden></p>
+    </section>
+
+    <section class="poi-dialog__section" data-facts-section hidden>
+      <h3 class="poi-dialog__heading">Auf einen Blick</h3>
+      <dl class="poi-facts" data-facts></dl>
+    </section>
+
+    <section class="poi-dialog__section" data-links-section hidden>
+      <h3 class="poi-dialog__heading">Mehr erfahren</h3>
+      <div class="poi-links" data-links></div>
+    </section>
+
+    <footer class="poi-dialog__footer">
+      <p class="poi-dialog__coordinates" data-coordinates></p>
+      <p class="poi-dialog__sources" data-sources hidden></p>
+    </footer>
+
+  </dialog>
+  <section id="preview-3d" aria-label="3D-Ansicht" hidden></section>
+</body>
+</html>

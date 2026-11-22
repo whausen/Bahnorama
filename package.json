@@ -1,0 +1,6 @@
+{
+  "name": "bahnorama",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node --test", "enrich-pois": "node scripts/enrich_pois.mjs" }
+}

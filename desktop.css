@@ -1,0 +1,119 @@
+/* Dedicated desktop shell; mobile CSS stays untouched. */
+#desktop-app[hidden] {display:none!important}
+@media(min-width:1024px){
+ body.desktop-active{overflow:hidden;background:#edf3f5;color:#193039}
+ body.desktop-active .header,body.desktop-active #scene{display:none!important}
+ body.desktop-active #desktop-app{display:flex!important;position:fixed;inset:0;z-index:20;flex-direction:column;background:#eef4f6;color:#193039;font:15px/1.45 system-ui,sans-serif}
+ .desktop-topbar{flex:none;height:76px;background:#fff;box-shadow:0 2px 14px #19303915;display:flex;align-items:center;justify-content:space-between;padding:10px 26px;gap:18px;z-index:2}
+ .desktop-brand{display:flex;align-items:center;gap:13px}.desktop-brand-icon{font-size:27px;background:#e1f5f0;border-radius:14px;padding:9px}.desktop-brand strong{font-size:23px;display:block;line-height:1.2}.desktop-brand small{font-size:12px;color:#62777d}
+ .desktop-top-actions{display:flex;gap:9px;align-items:center}.desktop-top-actions button{border-radius:12px;background:#eef5f5;color:#193039;border:1px solid #d9e5e6;padding:10px 16px;font-weight:600;box-shadow:none;transform:none}.desktop-top-actions button[aria-pressed=true]{background:#0d9484;color:#fff}
+ .desktop-main{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,360px);gap:16px;padding:16px 20px;flex:1;min-height:0}
+ .desktop-map-area{min-width:0;min-height:0;display:flex;flex-direction:column;background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 2px 14px #19303913}
+ .desktop-map-heading{flex:none;display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid #e6edef;gap:10px}.desktop-map-heading strong{font-size:17px}.desktop-map-heading span{color:#60757d;font-size:12px}
+ #desktop-map-host{flex:1;min-height:0;position:relative}#desktop-map-host #map-panel,#desktop-map-host .map-panel,#desktop-map-host .map-panel__map{width:100%!important;height:100%!important;min-height:0!important;margin:0!important;border:0!important;border-radius:0!important}
+ #desktop-ar-host{flex:1;min-height:0;display:flex;flex-direction:column}
+ #desktop-ar-stage{position:relative;flex:1;min-height:0}
+ #desktop-ar-stage .scene-stage{position:absolute}
+ .desktop-ar-controls{padding:10px 18px;display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+ #desktop-ar-permissions .permission-banner{background:#eef5f5;color:#193039}
+ .desktop-ar-controls #desktop-camera-toggle{background:#0d9484;color:#fff;border-radius:10px;padding:8px 12px}
+ .desktop-sidebar{min-height:0;overflow:auto;display:flex;flex-direction:column;background:#fff;border-radius:18px;padding:20px;gap:16px;box-shadow:0 2px 14px #19303913}
+ .desktop-sidebar-heading{display:grid;gap:3px;border-bottom:1px solid #e6edef;padding-bottom:14px}.desktop-sidebar-heading strong{font-size:20px}.desktop-sidebar-heading span{font-size:12px;color:#60757d}
+ #desktop-record-host{display:flex;justify-content:center;align-items:center;gap:10px;padding:8px 0}#desktop-record-host #record{background:#0d9484;color:white;border-radius:12px;padding:12px 28px;font-weight:700;box-shadow:none}#desktop-record-host #recording{font-size:12px}
+ #desktop-settings-host .sheet-settings{display:grid;gap:14px;margin:0;padding:0}#desktop-settings-host .device-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}#desktop-settings-host button{font-size:12px;min-width:0;padding:10px 7px;border-radius:10px}#desktop-settings-host .settings-check{font-size:13px}#desktop-settings-host details{padding:12px}
+ .desktop-sidebar-foot{margin-top:auto;padding-top:16px;border-top:1px solid #e6edef;color:#71838a;font-size:11px;text-align:center}
+ #desktop-attribution-host{flex:none;padding:0 20px 8px;font-size:10px;color:#536b71;max-height:35px;overflow:auto}#desktop-attribution-host .data-attribution{font-size:10px;text-align:center}#desktop-attribution-host .team-credit{display:inline;margin-left:10px}
+}
+
+/* Desktop V5: keep technical controls secondary to the trip. */
+@media (min-width:1024px) {
+ .desktop-sidebar { gap:14px; }
+ .desktop-trip-info { border:1px solid #e3ecee; background:#f7fafb; border-radius:14px; padding:16px; }
+ .desktop-trip-info h2 {font-size:16px;margin:0 0 13px;font-weight:750;color:#193039}
+ .desktop-trip-stats {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+ .desktop-trip-stats>div {background:#fff;border:1px solid #e7eff0;border-radius:11px;padding:12px;min-width:0}
+ .desktop-trip-stats>div:first-child {grid-column:1/-1}
+ .desktop-trip-stats span {display:block;font-size:11px;color:#667c82;margin-bottom:5px}
+ .desktop-trip-stats strong {font-size:15px;overflow-wrap:anywhere}
+ .desktop-trip-note {font-size:12px;color:#60757d;line-height:1.45;margin:12px 0}
+ .desktop-atlas-link {background:#e0f4ef!important;color:#087e73!important;border:1px solid #bce7dc!important;border-radius:10px;padding:10px 13px;box-shadow:none;font-weight:700;width:100%}
+ .desktop-settings-details {border:1px solid #dfeaec;border-radius:13px;background:#fff;flex:none}
+ .desktop-settings-details>summary {cursor:pointer;list-style:none;padding:15px 16px;font-weight:700;color:#193039;display:flex;align-items:center;justify-content:space-between}
+ .desktop-settings-details>summary::-webkit-details-marker{display:none}
+ .desktop-settings-details>summary::after{content:"▾";font-size:16px;color:#587078}
+ .desktop-settings-details[open]>summary::after{content:"▴"}
+ #desktop-settings-host {padding:0 15px 16px}
+ #desktop-settings-host .sheet-settings {gap:10px}
+ .desktop-sidebar-foot {padding-top:10px;margin-top:auto}
+}
+
+/* V6 – Atlas integrated beneath the persistent desktop navigation. */
+@media (min-width: 1024px) {
+  body.desktop-active #dashboard {
+    position: static;
+    flex: 1;
+    min-height: 0;
+    padding: 22px 24px 20px;
+    background: #eef4f6;
+    color: #193039;
+  }
+  body.desktop-active #dashboard:not([hidden]) #atlas-title {
+    margin: 0 0 14px !important;
+    font-size: 23px !important;
+    line-height: 1.25 !important;
+    color: #193039 !important;
+  }
+  body.desktop-active #dashboard:not([hidden]) .atlas-stats {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 240px)) !important;
+    gap: 12px !important;
+    margin: 0 0 16px !important;
+  }
+  body.desktop-active #dashboard:not([hidden]) .atlas-stats button {
+    min-height: 86px !important;
+    padding: 12px 16px !important;
+    background: #fff !important;
+    color: #193039 !important;
+    border: 1px solid #dce8eb !important;
+    border-radius: 14px !important;
+    box-shadow: 0 2px 8px #19303912 !important;
+  }
+  body.desktop-active #dashboard:not([hidden]) .atlas-stats strong {
+    font-size: 23px !important;
+    color: #0d9484 !important;
+  }
+  body.desktop-active #dashboard:not([hidden]) .atlas-map {
+    background: #fff !important;
+    border: 1px solid #dce8eb !important;
+    border-radius: 16px !important;
+  }
+  body.desktop-active #dashboard:not([hidden]) .atlas-map__view {
+    height: max(300px, calc(100dvh - 320px)) !important;
+  }
+  /* One scrollbar for the sidebar. Settings use natural content height. */
+  body.desktop-active .desktop-sidebar {
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+  }
+  body.desktop-active .desktop-settings-details,
+  body.desktop-active #desktop-settings-host,
+  body.desktop-active #desktop-settings-host .sheet-settings,
+  body.desktop-active #desktop-settings-host .developer-body {
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+  body.desktop-active .desktop-settings-details > summary {
+    position: relative;
+    min-height: 48px;
+  }
+  body.desktop-active .desktop-trip-info {
+    padding: 13px !important;
+  }
+  body.desktop-active .desktop-trip-stats > div {
+    padding: 10px !important;
+  }
+  body.desktop-active .desktop-trip-note {
+    margin: 9px 0 !important;
+  }
+}
