@@ -73,17 +73,27 @@ const mapPanel = window.L ? createMapPanel($('map-panel'), {
 
 syncCollectedPois();
 
+const mapPoiStatus = $('map-poi-status');
 let mapQuery = 0;
 let mapQueryTimer;
 function refreshMapPois({lat, lon}) {
   const query = ++mapQuery;
   clearTimeout(mapQueryTimer);
+  mapPoiStatus.textContent = 'Orte in der Kartenmitte werden geladen …';
   mapQueryTimer = setTimeout(async () => {
     try {
       const results = await loadNearbyPois(lat, lon);
-      if (query === mapQuery) mapPanel.setPois([...currentPois, ...newPois(results)]);
-    } catch {
-      if (query === mapQuery) mapPanel.setPois(currentPois);
+      if (query !== mapQuery) return;
+      const nearby = newPois(results);
+      mapPanel.setPois([...currentPois, ...nearby]);
+      mapPoiStatus.textContent = nearby.length
+        ? `${nearby.length} zusätzliche Orte rund um die Kartenmitte geladen.`
+        : 'Keine zusätzlichen Orte rund um die Kartenmitte gefunden.';
+    } catch (error) {
+      if (query !== mapQuery) return;
+      console.warn('Bahnorama: Orte konnten nicht geladen werden', error);
+      mapPanel.setPois(currentPois);
+      mapPoiStatus.textContent = 'Zusätzliche Orte sind derzeit nicht abrufbar.';
     }
   }, 450);
 }
