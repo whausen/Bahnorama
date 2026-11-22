@@ -6,7 +6,7 @@ import {createOverlay} from './ar/overlay.js';
 import {createMapPanel} from './map/map-panel.js?v=27';
 import {createNearbyPois} from './data/nearbyPois.js?v=28';
 import {pois} from './data/mainzTestPois.js';
-import {regionalLod2Pois} from './data/regionalLod2Pois.js';
+import {regionalLod2Pois} from './data/regionalLod2Pois.js?v=29';
 import {poiEnrichment} from './data/poiEnrichment.js';
 import {createPoiDetails} from './data/details.js?v=28';
 import {createAtlas} from './atlas/store.js';
@@ -153,7 +153,7 @@ async function loadBuildingManifest(path) {
 
 Promise.all([
   loadBuildingManifest('./assets/buildings/manifest.json'),
-  loadBuildingManifest('./assets/buildings/lod2/manifest.json?v=26'),
+  loadBuildingManifest('./assets/buildings/lod2/manifest.json?v=29'),
 ]).then(([osmManifest, lod2Manifest]) => {
   const osm = applyBuildingManifest(currentPois, osmManifest);
   const lod2 = applyLod2Manifest(currentPois, lod2Manifest);

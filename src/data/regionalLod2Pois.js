@@ -12,5 +12,14 @@ export const regionalLod2Pois = [
     "lat": 49.75964,
     "lon": 6.64414,
     "source": "https://de.wikipedia.org/wiki/Porta_Nigra"
+  },
+  {
+    "id": "frankfurt-hauptbahnhof",
+    "name": "Frankfurt (Main) Hauptbahnhof",
+    "lat": 50.1071,
+    "lon": 8.6631,
+    "category": "Verkehr",
+    "area": "Frankfurt am Main",
+    "source": "https://www.bahnhof.de/frankfurt-main-hbf"
   }
 ];
