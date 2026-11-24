@@ -9,7 +9,7 @@ import {createNearbyPois} from './data/nearbyPois.js?v=28';
 import {pois} from './data/mainzTestPois.js';
 import {regionalLod2Pois} from './data/regionalLod2Pois.js?v=30';
 import {poiEnrichment} from './data/poiEnrichment.js';
-import {createPoiDetails} from './data/details.js?v=28';
+import {createPoiDetails} from './data/details.js?v=34';
 import {createAtlas} from './atlas/store.js';
 import {renderDashboard} from './atlas/view.js';
 import {createJourneyRecorder} from './journey/recorder.js';
