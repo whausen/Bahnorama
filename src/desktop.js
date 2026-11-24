@@ -1,4 +1,4 @@
-import {desktopLayout, showView} from './main.js?v=33';
+import {desktopLayout, showView} from './main.js?v=34';
 
 const desktop = document.getElementById('desktop-app');
 const dashboard = document.getElementById('dashboard');
