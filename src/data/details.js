@@ -1,7 +1,8 @@
 async function loadWikipediaDetails(pageId, article) {
   const params = new URLSearchParams({
     action: 'query', format: 'json', formatversion: '2', origin: '*',
-    prop: 'extracts|pageprops', ppprop: 'wikibase_item',
+    prop: 'extracts|pageprops|pageimages', ppprop: 'wikibase_item',
+    piprop: 'name|thumbnail', pithumbsize: '800', pilicense: 'free',
     exintro: '1', explaintext: '1', exchars: '350', redirects: '1',
   });
   params.set(pageId ? 'pageids' : 'titles', pageId || article);
@@ -10,6 +11,31 @@ async function loadWikipediaDetails(pageId, article) {
   });
   if (!response.ok) return null;
   return (await response.json()).query?.pages?.[0];
+}
+
+async function loadWikipediaPhoto(page, name) {
+  const params = new URLSearchParams({
+    action: 'query', format: 'json', formatversion: '2', origin: '*',
+    prop: 'imageinfo', titles: 'File:' + page.pageimage,
+    iiprop: 'url|extmetadata', iiextmetadatafilter: 'Artist|LicenseShortName|Attribution',
+  });
+  const response = await fetch('https://de.wikipedia.org/w/api.php?' + params, {
+    signal: AbortSignal.timeout(6000),
+  });
+  if (!response.ok) return null;
+  const image = (await response.json()).query?.pages?.[0]?.imageinfo?.[0];
+  const metadata = image?.extmetadata;
+  if (!image?.descriptionurl || !metadata?.LicenseShortName?.value) return null;
+  const parser = new DOMParser();
+  const plainText = html => parser.parseFromString(html ?? '', 'text/html').body.textContent.trim();
+  const artist = plainText(metadata.Attribution?.value || metadata.Artist?.value);
+  const license = plainText(metadata.LicenseShortName.value);
+  return {
+    url: page.thumbnail.source,
+    alt: name,
+    source: image.descriptionurl,
+    credit: [artist, license].filter(Boolean).join(' · '),
+  };
 }
 
 export function createPoiDetails(dialog, collect, announce, isCollected = () => false) {
@@ -233,7 +259,7 @@ export function createPoiDetails(dialog, collect, announce, isCollected = () => 
         if (!page && articles.get(key) === request) articles.delete(key);
       });
     }
-    articles.get(key).then(page => {
+    articles.get(key).then(async page => {
       if (!page || page.missing || selected !== poi || !dialog.open) return;
       const articleUrl = 'https://de.wikipedia.org/?curid=' + page.pageid;
       const links = [...(poi.links ?? [{label: 'Wikipedia', href: articleUrl}])];
@@ -247,6 +273,9 @@ export function createPoiDetails(dialog, collect, announce, isCollected = () => 
         descriptionCredit: 'Auszug aus Wikipedia · CC BY-SA',
         descriptionSource: articleUrl,
       });
+      if (poi.photos?.some(photo => photo?.url) || !page.thumbnail?.source || !page.pageimage) return;
+      const photo = await loadWikipediaPhoto(page, poi.name).catch(() => null);
+      if (photo && selected === poi && dialog.open) renderPhotos({...poi, photos: [photo]});
     });
   };
 }
