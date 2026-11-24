@@ -132,9 +132,7 @@ export function createOverlay(
     const candidates = [];
     entries.forEach((poi, index) => {
       const relative = offsets[index];
-      const fromNearbySearch = /^(osm-|wikipedia-de-)/.test(poi.id);
-      const maxDistance = fromNearbySearch ? 3000 : MAX_DISTANCE_M;
-      if (!relative || relative.distance > maxDistance) return;
+      if (!relative || relative.distance > MAX_DISTANCE_M) return;
 
       const up = Number.isFinite(poi.altitude) && Number.isFinite(position.altitude)
         ? poi.altitude - position.altitude : 0;

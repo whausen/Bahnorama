@@ -50,7 +50,7 @@ test('places two competing labels above and below their anchors', t => {
   assert.ok(parseFloat(labels[0].style.top) > points[0][1]);
 });
 
-test('shows a nationwide POI in the camera view beyond the Mainz display radius', t => {
+test('shows nationwide POIs only within the AR display radius', t => {
   const originalDocument = globalThis.document;
   globalThis.document = {
     createElement: () => ({style: {}, offsetWidth: 100, offsetHeight: 26, append() {}, addEventListener() {}}),
@@ -66,9 +66,9 @@ test('shows a nationwide POI in the camera view beyond the Mainz display radius'
   const video = {classList: {contains: () => false}};
   const position = {lat: 50, lon: 8};
   const render = createOverlay(canvas, markers, [
-    {id: 'osm-node-1', name: 'Nearby attraction', lat: 50.02, lon: 8},
+    {id: 'osm-node-1', name: 'Nearby attraction', lat: 50.01, lon: 8},
     {id: 'local', name: 'Local attraction', lat: 50.02, lon: 8},
-    {id: 'wikipedia-de-2', name: 'Distant attraction', lat: 50.04, lon: 8},
+    {id: 'wikipedia-de-2', name: 'Distant attraction', lat: 50.02, lon: 8},
   ], () => {}, video);
 
   render({position, camera: manualCameraPose(0, 0)}, [65, 55]);

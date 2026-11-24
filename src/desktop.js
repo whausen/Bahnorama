@@ -1,4 +1,4 @@
-import {desktopLayout, showView} from './main.js?v=31';
+import {desktopLayout, showView} from './main.js?v=32';
 
 const desktop = document.getElementById('desktop-app');
 const dashboard = document.getElementById('dashboard');
@@ -8,7 +8,6 @@ const slots = [
   ['record', 'desktop-record-host'],
   ['recording', 'desktop-record-host'],
   ['permission-banner', 'desktop-ar-permissions'],
-  ['ar-nearby-banner', 'desktop-ar-permissions'],
 ].map(([id, host]) => [document.getElementById(id), document.getElementById(host)]);
 
 slots.push(
