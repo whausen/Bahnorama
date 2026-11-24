@@ -3,7 +3,7 @@ import {createOrientation} from './device/orientation.js?v=23';
 import {createPosition} from './device/position.js';
 import {createPoseProvider} from './ar/pose.js';
 import {distanceAndBearing} from './ar/geometry.js';
-import {createOverlay} from './ar/overlay.js';
+import {createOverlay} from './ar/overlay.js?v=31';
 import {createMapPanel} from './map/map-panel.js?v=27';
 import {createNearbyPois} from './data/nearbyPois.js?v=28';
 import {pois} from './data/mainzTestPois.js';
@@ -29,6 +29,10 @@ console.log(`Bahnorama: ${currentPois.length} POIs geladen`);
 const loadNearbyPois = createNearbyPois();
 const nearbyGps = $('nearby-gps');
 const nearbyStatus = $('nearby-status');
+const nearbyPreference = 'bahnorama.nearbyGps.v1';
+try {
+  nearbyGps.checked = localStorage.getItem(nearbyPreference) === 'true';
+} catch { /* The setting remains available for this session. */ }
 const localOsmRefs = new Set(currentPois.map(poi => poi.osmRef).filter(Boolean));
 const newPois = list => list.filter(poi => !poi.osmRef || !localOsmRefs.has(poi.osmRef));
 
@@ -215,17 +219,23 @@ const overlayFor = entries => createOverlay(
 let renderOverlay = overlayFor(currentPois);
 let gpsQuery;
 let nextGpsSearch = 0;
-function refreshGpsPois(fix) {
+function updateNearbyBanner() {
+  const banner = $('ar-nearby-banner');
+  banner.hidden = activeView !== 'ar' || nearbyGps.checked;
+}
+
+function refreshGpsPois(fix, immediate = false) {
+  updateNearbyBanner();
   if (!nearbyGps.checked || fix.source !== 'gps') {
     if (gpsQuery) {
       gpsQuery = null;
       nextGpsSearch = 0;
       renderOverlay = overlayFor(currentPois);
-      nearbyStatus.textContent = '';
     }
+    nearbyStatus.textContent = nearbyGps.checked ? 'Warte auf einen GPS-Standort …' : '';
     return;
   }
-  if (Date.now() < nextGpsSearch) return;
+  if (!immediate && Date.now() < nextGpsSearch) return;
   nextGpsSearch = Date.now() + 15000;
   const query = loadNearbyPois(fix.lat, fix.lon);
   if (query === gpsQuery) return;
@@ -235,7 +245,9 @@ function refreshGpsPois(fix) {
     if (gpsQuery !== query) return;
     const nearby = newPois(results);
     renderOverlay = overlayFor([...currentPois, ...nearby]);
-    nearbyStatus.textContent = `${nearby.length} zusätzliche Orte geladen.`;
+    nearbyStatus.textContent = nearby.length
+      ? `${nearby.length} Orte geladen. AR zeigt Orte bis 3 km in Blickrichtung.`
+      : 'Die Umkreissuche hat keine zusätzlichen Orte gefunden.';
   }).catch(() => {
     if (gpsQuery !== query) return;
     renderOverlay = overlayFor(currentPois);
@@ -451,7 +463,18 @@ function handlePositionUpdate(fix, status, error) {
   announce(status);
 }
 const position = createPosition(handlePositionUpdate);
-nearbyGps.addEventListener('change', () => refreshGpsPois(position.current));
+function applyNearbyPreference() {
+  try {
+    localStorage.setItem(nearbyPreference, String(nearbyGps.checked));
+  } catch { /* The setting remains available for this session. */ }
+  refreshGpsPois(position.current, true);
+  if (nearbyGps.checked && !position.active) startGps(true);
+}
+nearbyGps.addEventListener('change', applyNearbyPreference);
+$('enable-nearby').addEventListener('click', () => {
+  nearbyGps.checked = true;
+  applyNearbyPreference();
+});
 const poses = createPoseProvider(position, orientation);
 const value = id => Number($(id).value);
 
@@ -642,6 +665,8 @@ export function showView(view) {
     }
   }
   activeView = view;
+  if (view === 'ar') refreshGpsPois(position.current, true);
+  else updateNearbyBanner();
   stage.hidden = view !== 'ar';
   $('scene').hidden = atlasVisible;
   dashboard.hidden = !atlasVisible;

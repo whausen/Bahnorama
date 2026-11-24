@@ -49,3 +49,28 @@ test('places two competing labels above and below their anchors', t => {
   render({position, camera: manualCameraPose(0, -27)}, fov);
   assert.ok(parseFloat(labels[0].style.top) > points[0][1]);
 });
+
+test('shows a nationwide POI in the camera view beyond the Mainz display radius', t => {
+  const originalDocument = globalThis.document;
+  globalThis.document = {
+    createElement: () => ({style: {}, offsetWidth: 100, offsetHeight: 26, append() {}, addEventListener() {}}),
+  };
+  t.after(() => { globalThis.document = originalDocument; });
+  const ctx = {
+    setTransform() {}, clearRect() {}, beginPath() {}, moveTo() {},
+    lineTo() {}, arc() {}, fill() {}, stroke() {},
+  };
+  const labels = [];
+  const markers = {replaceChildren() {}, append(label) { labels.push(label); }};
+  const canvas = {clientWidth: 360, clientHeight: 640, getContext: () => ctx};
+  const video = {classList: {contains: () => false}};
+  const position = {lat: 50, lon: 8};
+  const render = createOverlay(canvas, markers, [
+    {id: 'osm-node-1', name: 'Nearby attraction', lat: 50.02, lon: 8},
+    {id: 'local', name: 'Local attraction', lat: 50.02, lon: 8},
+    {id: 'wikipedia-de-2', name: 'Distant attraction', lat: 50.04, lon: 8},
+  ], () => {}, video);
+
+  render({position, camera: manualCameraPose(0, 0)}, [65, 55]);
+  assert.deepEqual(labels.map(label => label.hidden), [false, true, true]);
+});

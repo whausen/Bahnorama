@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="./style.css?v=23">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script type="module" src="./src/desktop.js?v=30"></script>
+  <script type="module" src="./src/desktop.js?v=31"></script>
   <script type="module" src="./src/preview3d.js?v=23"></script>
   <link rel="stylesheet" href="./desktop.css?v=23">
   <script>
@@ -58,6 +58,10 @@
         <button id="enable-ar" type="button" class="primary">AR aktivieren</button>
         <button id="permission-gps" type="button" hidden>GPS aktivieren</button>
         <span id="permission-gps-status" hidden></span>
+      </div>
+      <div id="ar-nearby-banner" class="permission-banner" hidden>
+        <span id="ar-nearby-message" role="status">Für Orte am Standort wird ein gerundeter Suchpunkt an Overpass oder Wikipedia gesendet.</span>
+        <button id="enable-nearby" type="button">Orte in der Nähe laden</button>
       </div>
     </div>
 
