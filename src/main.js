@@ -27,6 +27,8 @@ const currentPois = [...pois, ...regionalLod2Pois].map(poi => ({
 console.log(`Bahnorama: ${currentPois.length} POIs geladen`);
 
 const loadNearbyPois = createNearbyPois();
+const nearbyGps = $('nearby-gps');
+nearbyGps.checked = true;
 const nearbyStatus = $('nearby-status');
 const localOsmRefs = new Set(currentPois.map(poi => poi.osmRef).filter(Boolean));
 const newPois = list => list.filter(poi => !poi.osmRef || !localOsmRefs.has(poi.osmRef));
@@ -215,13 +217,13 @@ let renderOverlay = overlayFor(currentPois);
 let gpsQuery;
 let nextGpsSearch = 0;
 function refreshGpsPois(fix, immediate = false) {
-  if (fix.source !== 'gps') {
+  if (!nearbyGps.checked || fix.source !== 'gps') {
     if (gpsQuery) {
       gpsQuery = null;
       nextGpsSearch = 0;
       renderOverlay = overlayFor(currentPois);
     }
-    nearbyStatus.textContent = 'Warte auf einen GPS-Standort …';
+    nearbyStatus.textContent = nearbyGps.checked ? 'Warte auf einen GPS-Standort …' : '';
     return;
   }
   if (!immediate && Date.now() < nextGpsSearch) return;
@@ -439,7 +441,7 @@ function handlePositionUpdate(fix, status, error) {
   refreshGpsPois(fix);
   mapPanel?.setLocation(fix);
   if (fix.source === 'gps' && !mapCentered) {
-    mapPanel?.setView(fix.lat, fix.lon);
+    mapPanel?.setView(fix.lat, fix.lon, undefined, nearbyGps.checked);
     mapCentered = true;
   }
   if (error) {
@@ -452,6 +454,7 @@ function handlePositionUpdate(fix, status, error) {
   announce(status);
 }
 const position = createPosition(handlePositionUpdate);
+nearbyGps.addEventListener('change', () => refreshGpsPois(position.current, true));
 const poses = createPoseProvider(position, orientation);
 const value = id => Number($(id).value);
 
